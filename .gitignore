@@ -1,0 +1,40 @@
+# Python generic .gitignore
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.env
+.env*
+venv/
+ENV/
+env/
+.ipynb_checkpoints/
+.DS_Store
+*.swp
+*.bak
+*.tmp
+*.old
+*.orig
+*.coverage
+.coverage.*
+.cache/
+.mypy_cache/
+.pytest_cache/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
