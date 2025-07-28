@@ -1,0 +1,4 @@
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = https://bits-mlops-assignment.s3.us-east-1.amazonaws.com/housing.csv
