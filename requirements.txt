@@ -1,0 +1,4 @@
+dvc==3.61.0
+dvc-s3==3.2.2
+scikit-learn==1.7.1
+pandas==2.3.1
