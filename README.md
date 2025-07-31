@@ -84,7 +84,7 @@ To generate the EDA report:
 
 1. Open the notebook: `notebooks/data_preprocess.ipynb`
 2. Run all cells to generate the report
-3. The report will be saved as `reports/eda_report.html`
+3. The report will be saved as `reports/initial_eda_report.html`
 
 ### 3. View the Report
 
@@ -92,7 +92,7 @@ Once generated, open the HTML report in your browser:
 
 ```bash
 # Open the report in your default browser (macOS)
-open reports/eda_report.html
+open reports/initial_eda_report.html
 
 # Or open it manually by navigating to the reports folder
 ```
