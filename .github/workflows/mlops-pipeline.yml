@@ -61,20 +61,45 @@ jobs:
     #   run: |
     #     black --check --diff .
 
-    - name: Run unit tests
+    - name: Run unit tests (no API required)
       run: |
-        python -m pytest tests/ -v --tb=short
+        # Run unit tests that don't require API
+        python -m pytest tests/test_unit.py -v --tb=short
 
-    - name: Test API endpoints
+    - name: Run basic Python syntax checks
+      run: |
+        # Run basic Python syntax validation on source code
+        python -m py_compile src/*.py
+        python -m py_compile api/*.py
+        echo "✅ Python syntax validation passed"
+
+    - name: Start services for API testing
       run: |
         # Start services in background
         docker compose up -d --build
-        sleep 30
+        echo "Services starting..."
 
-        # Run API tests
-        python tests/test_api.py
+    - name: Wait for services to be ready
+      run: |
+        # Wait for API to be healthy
+        echo "Waiting for API to start..."
+        for i in {1..30}; do
+          if curl -f http://localhost:8000/api/v1/health/ 2>/dev/null; then
+            echo "✅ API is ready!"
+            break
+          fi
+          echo "Waiting... ($i/30)"
+          sleep 10
+        done
 
-        # Cleanup
+    - name: Run API and integration tests
+      run: |
+        # Run API tests (require running services)
+        python -m pytest tests/test_api.py tests/test_api_comprehensive.py tests/test_prometheus.py -v --tb=short
+
+    - name: Cleanup services
+      if: always()
+      run: |
         docker compose down
 
   # Job 2: Check for new data and retrain model
