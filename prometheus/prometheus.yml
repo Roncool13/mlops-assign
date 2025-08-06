@@ -1,0 +1,43 @@
+# Prometheus configuration for monitoring California Housing API
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+scrape_configs:
+  # California Housing API - Standard metrics
+  - job_name: 'california-housing-api'
+    static_configs:
+      - targets: ['california-housing-api:5001']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    honor_labels: true
+
+  # California Housing API - ML-specific metrics
+  - job_name: 'california-housing-api-ml'
+    static_configs:
+      - targets: ['california-housing-api:5001']
+    metrics_path: '/ml-metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    honor_labels: true
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s

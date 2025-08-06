@@ -38,3 +38,25 @@ env/
 
 # VS Code
 .vscode/
+
+# MLOps specific
+mlruns/
+mlflow.db
+artifacts/
+models/versions/
+logs/*.log
+*.joblib.bak
+docker-compose.yml.bak
+
+# AWS deployment
+aws-deployment.env
+*.pem
+
+# Docker
+.dockerignore
+
+# CI/CD
+.github/workflows/*.bak
+
+# Custom scripts
+scripts/prepare-commit.sh
