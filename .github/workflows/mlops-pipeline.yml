@@ -34,46 +34,46 @@ jobs:
   # Job 1: Lint and Test
   lint-and-test:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-        
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install flake8 black pytest
         pip install -r requirements.txt
-        
+
     - name: Lint with flake8
       run: |
         # Stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # Exit-zero treats all errors as warnings
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-        
+
     - name: Format check with black
       run: |
         black --check --diff .
-        
+
     - name: Run unit tests
       run: |
         python -m pytest tests/ -v --tb=short
-        
+
     - name: Test API endpoints
       run: |
         # Start services in background
         docker compose up -d --build
         sleep 30
-        
+
         # Run API tests
         python tests/test_api.py
-        
+
         # Cleanup
         docker compose down
 
@@ -84,26 +84,26 @@ jobs:
     outputs:
       model_updated: ${{ steps.retrain.outputs.model_updated }}
       model_version: ${{ steps.retrain.outputs.model_version }}
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-        
+
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-        
+
     - name: Check for new data
       id: check_data
       run: |
         # Simulate checking for new data (replace with actual data source check)
         echo "Checking for new data..."
-        
+
         # Check if forced retraining is requested
         if [ "${{ github.event.inputs.retrain_model }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
           echo "new_data=true" >> $GITHUB_OUTPUT
@@ -113,7 +113,7 @@ jobs:
           LAST_UPDATE=$(stat -c %Y data/california_housing_dataset/housing.csv 2>/dev/null || echo 0)
           CURRENT_TIME=$(date +%s)
           AGE_DAYS=$(( (CURRENT_TIME - LAST_UPDATE) / 86400 ))
-          
+
           if [ $AGE_DAYS -gt 7 ]; then
             echo "new_data=true" >> $GITHUB_OUTPUT
             echo "📅 Data is $AGE_DAYS days old, triggering retraining"
@@ -122,40 +122,40 @@ jobs:
             echo "✅ Data is fresh (${AGE_DAYS} days old)"
           fi
         fi
-        
+
     - name: Retrain model if needed
       id: retrain
       if: steps.check_data.outputs.new_data == 'true'
       run: |
         echo "🚀 Starting model retraining..."
-        
+
         # Generate version
         VERSION=$(date +%Y%m%d-%H%M%S)
         echo "model_version=$VERSION" >> $GITHUB_OUTPUT
-        
+
         # Load and preprocess data
         python -c "
         from sklearn.datasets import fetch_california_housing
         import pandas as pd
         import os
-        
+
         os.makedirs('data/california_housing_dataset', exist_ok=True)
         data = fetch_california_housing(as_frame=True)
         df = data.frame
         df.to_csv('data/california_housing_dataset/housing.csv', index=False)
         print('✅ Data loaded successfully')
         "
-        
+
         # Train models
         python src/model_train.py
-        
+
         # Tag models with version
         mkdir -p models/versions/$VERSION
         cp models/*.joblib models/versions/$VERSION/
-        
+
         echo "model_updated=true" >> $GITHUB_OUTPUT
         echo "✅ Model retraining completed - Version: $VERSION"
-        
+
     - name: Upload model artifacts
       if: steps.retrain.outputs.model_updated == 'true'
       uses: actions/upload-artifact@v4
@@ -174,40 +174,40 @@ jobs:
     outputs:
       image_tag: ${{ steps.tags.outputs.image_tag }}
       version: ${{ steps.tags.outputs.version }}
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Download model artifacts (if updated)
       if: needs.check-data-and-retrain.outputs.model_updated == 'true'
       uses: actions/download-artifact@v4
       with:
         name: trained-models-${{ needs.check-data-and-retrain.outputs.model_version }}
-        
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      
+
     - name: Login to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-        
+
     - name: Generate image tags
       id: tags
       run: |
         VERSION=${GITHUB_SHA:0:8}
         MODEL_VERSION=${{ needs.check-data-and-retrain.outputs.model_version }}
-        
+
         if [ "$MODEL_VERSION" != "" ]; then
           VERSION="${VERSION}-model-${MODEL_VERSION}"
         fi
-        
+
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "image_tag=${DOCKER_IMAGE}:${VERSION}" >> $GITHUB_OUTPUT
         echo "latest_tag=${DOCKER_IMAGE}:latest" >> $GITHUB_OUTPUT
-        
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
@@ -225,30 +225,30 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-and-push]
     if: |
-      always() && 
-      needs.build-and-push.result == 'success' && 
-      (github.event.inputs.deploy_target == 'local' || 
-       github.event.inputs.deploy_target == 'both' || 
+      always() &&
+      needs.build-and-push.result == 'success' &&
+      (github.event.inputs.deploy_target == 'local' ||
+       github.event.inputs.deploy_target == 'both' ||
        github.event.inputs.deploy_target == '')
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Pull latest images
       run: |
         docker compose pull
-        
+
     - name: Deploy locally
       run: |
         chmod +x scripts/deploy.sh
         ./scripts/deploy.sh deploy
-        
+
     - name: Run deployment tests
       run: |
         sleep 30  # Wait for services to be ready
         ./scripts/deploy.sh smoke
-        
+
     - name: Generate deployment report
       run: |
         echo "## 🚀 Local Deployment Report" >> $GITHUB_STEP_SUMMARY
@@ -261,22 +261,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-and-push]
     if: |
-      always() && 
-      needs.build-and-push.result == 'success' && 
-      (github.event.inputs.deploy_target == 'aws' || 
+      always() &&
+      needs.build-and-push.result == 'success' &&
+      (github.event.inputs.deploy_target == 'aws' ||
        github.event.inputs.deploy_target == 'both')
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
-        
+
     - name: Deploy to EC2
       run: |
         chmod +x scripts/aws-deploy.sh
@@ -287,7 +287,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-local, deploy-aws]
     if: always()
-    
+
     steps:
     - name: Send notification
       run: |
