@@ -4,7 +4,6 @@ Unit tests for the California Housing API
 """
 
 import pytest
-from regex import F
 import requests
 import time
 
