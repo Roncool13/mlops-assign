@@ -361,27 +361,25 @@ class Prediction(Resource):
         """
         request_start_time = time.time()
         
+        # Validate input
+        data = request.json
+        if not isinstance(data, dict):
+            ml_metrics.record_validation_error('missing_data')
+            api.abort(400, "No input data provided or input is not a valid JSON object")
+
         try:
-            # Validate input
-            data = request.json
-            if not data:
-                # Record validation error
-                ml_metrics.record_validation_error('missing_data')
-                api.abort(400, "No input data provided")
-            
-            # Validate using Pydantic
-            try:
-                input_model = PredictionInput(**data)
-                input_dict = input_model.dict()
-            except ValidationError as e:
-                # Record validation error
-                ml_metrics.record_validation_error('pydantic_validation')
-                logger.warning(f"Input validation failed: {str(e)}")
-                api.abort(400, f"Input validation failed: {str(e)}")
-            
+            input_model = PredictionInput(**data)
+        except ValidationError as e:
+            ml_metrics.record_validation_error('pydantic_validation')
+            logger.warning(f"Input validation failed: {str(e)}")
+            api.abort(400, f"Input validation failed: {str(e)}")
+
+        input_dict = input_model.dict()
+
+        try:
             # Make prediction
             prediction = predictor.predict(input_dict)
-            
+
             # Create response
             response = {
                 "prediction": round(prediction, 3),
@@ -391,22 +389,22 @@ class Prediction(Resource):
                 "timestamp": datetime.now().isoformat(),
                 "input_features": input_dict
             }
-            
+
             # Calculate request duration and record metrics
             request_duration = time.time() - request_start_time
             ml_metrics.record_request('POST', '/api/v1/prediction/predict', 200, request_duration)
-            
+
             # Log the request
             logger.info(f"Prediction request: {input_dict}")
             logger.info(f"Prediction response: ${prediction:.3f}M")
-            
+
             return response
-            
+
         except Exception as e:
             # Calculate request duration for error case
             request_duration = time.time() - request_start_time
             ml_metrics.record_request('POST', '/api/v1/prediction/predict', 500, request_duration)
-            
+
             logger.error(f"Error in prediction endpoint: {str(e)}")
             api.abort(500, f"Internal server error: {str(e)}")
 
