@@ -4,6 +4,6 @@ pytest-asyncio>=0.21.0
 black>=23.7.0
 flake8>=6.0.0
 requests>=2.31.0
-
+dataprep==0.4.5
 # Production dependencies from requirements.txt are automatically included
 # This file contains additional development and testing dependencies
