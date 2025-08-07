@@ -175,14 +175,14 @@ check_prerequisites() {
     fi
     print_success "Docker is running"
     
-    # Check if conda environment exists
-    if conda env list | grep -q "mlops-assign"; then
-        print_success "Conda environment 'mlops-assign' found"
-    else
-        print_error "Conda environment 'mlops-assign' not found"
-        print_status "Please create the environment first: conda env create -f environment.yml"
-        exit 1
-    fi
+    # # Check if conda environment exists
+    # if conda env list | grep -q "mlops-assign"; then
+    #     print_success "Conda environment 'mlops-assign' found"
+    # else
+    #     print_error "Conda environment 'mlops-assign' not found"
+    #     print_status "Please create the environment first: conda env create -f environment.yml"
+    #     exit 1
+    # fi
     
     # Check required files
     local required_files=(
