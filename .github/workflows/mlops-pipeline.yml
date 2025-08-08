@@ -305,7 +305,7 @@ jobs:
     - name: Deploy to EC2
       run: |
         chmod +x scripts/aws-deploy.sh
-        ./scripts/aws-deploy.sh deploy
+        ./scripts/aws-deploy.sh full
 
   # Job 6: Notification and Cleanup
   notify:
