@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-AWS_REGION=${AWS_REGION:-us-west-2}
+AWS_REGION=${AWS_REGION:-us-east-2}
 EC2_INSTANCE_TYPE=${EC2_INSTANCE_TYPE:-t3.medium}
 KEY_NAME=${AWS_KEY_NAME:-mlops-keypair}
 SECURITY_GROUP=${AWS_SECURITY_GROUP:-mlops-sg}
@@ -373,7 +373,7 @@ show_usage() {
     echo "  help        - Show this help message"
     echo ""
     echo "Environment Variables:"
-    echo "  AWS_REGION          - AWS region (default: us-west-2)"
+    echo "  AWS_REGION          - AWS region (default: us-east-2)"
     echo "  EC2_INSTANCE_TYPE   - Instance type (default: t3.medium)"
     echo "  AWS_KEY_NAME        - Key pair name (default: mlops-keypair)"
     echo "  AWS_SECURITY_GROUP  - Security group name (default: mlops-sg)"
