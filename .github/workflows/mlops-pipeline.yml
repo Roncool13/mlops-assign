@@ -101,7 +101,7 @@ jobs:
         python -m pytest tests/test_api.py tests/test_api_comprehensive.py tests/test_prometheus.py -v --tb=short
 
     - name: Run PR-specific lightweight tests
-      if: github.event_name == 'pull_request' && github.base_ref != 'main'
+      if: github.event_name == 'pull_request'
       run: |
         # Run only essential tests for feature PRs
         echo "🔍 Running lightweight tests for PR..."
