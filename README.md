@@ -3,8 +3,29 @@
 A complete MLOps pipeline for predicting California housing prices using machine learning, featuring a production-ready REST API with interactive Swagger documentation, containerized deployment, and comprehensive monitoring.
 
 [![Python](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-2.3.3-green.svg)](https://fl## ⚡ Next Steps
+[![Flask](https://img.shields.io/badge/Flask-2.3.3-green.svg)](https://fl## ⚡ Ne### 🚀 Production Deployment
 
+```bash
+# Docker Compose with multiple replicas
+docker-compose up --scale api=3
+
+# Load balancer with nginx
+docker-compose -f docker-compose.prod.yml up
+
+# AWS deployment (requires AWS credentials)
+./scripts/aws-deploy.sh full
+```
+
+**GitHub Secrets for CI/CD:**
+- `AWS_ACCESS_KEY_ID` - Your AWS access key
+- `AWS_SECRET_ACCESS_KEY` - Your AWS secret key  
+- `DOCKERHUB_USERNAME` - DockerHub username
+- `DOCKERHUB_TOKEN` - DockerHub access token
+
+**Optional AWS Configuration:**
+- `AWS_KEY_NAME` - EC2 key pair name (default: mlops-keypair)
+- `AWS_SECURITY_GROUP` - Security group name (default: mlops-sg)  
+- `INSTANCE_NAME` - EC2 instance name (default: mlops-california-housing)
 1. **🚀 Quick Star## 📞 Support
 
 For questions or issues:

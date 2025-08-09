@@ -327,10 +327,48 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
+    - name: Prepare deployment environment
+      run: |
+        # Create necessary directories
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        
+        # Install additional tools if needed
+        which aws || echo "AWS CLI should be available"
+        
+        # Set environment variables for deployment
+        export AWS_KEY_NAME="${{ secrets.AWS_KEY_NAME || 'mlops-keypair' }}"
+        export AWS_SECURITY_GROUP="${{ secrets.AWS_SECURITY_GROUP || 'mlops-sg' }}"
+        export INSTANCE_NAME="${{ secrets.INSTANCE_NAME || 'mlops-california-housing' }}"
+        
+        echo "AWS_KEY_NAME=$AWS_KEY_NAME" >> $GITHUB_ENV
+        echo "AWS_SECURITY_GROUP=$AWS_SECURITY_GROUP" >> $GITHUB_ENV
+        echo "INSTANCE_NAME=$INSTANCE_NAME" >> $GITHUB_ENV
+
     - name: Deploy to EC2
       run: |
         chmod +x scripts/aws-deploy.sh
         ./scripts/aws-deploy.sh full
+
+    - name: Generate AWS deployment report
+      if: always()
+      run: |
+        echo "## 🌍 AWS Deployment Report" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f "aws-deployment.env" ]; then
+          source aws-deployment.env
+          echo "- **Region**: $AWS_REGION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Instance ID**: $INSTANCE_ID" >> $GITHUB_STEP_SUMMARY
+          echo "- **Public IP**: $PUBLIC_IP" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Deployed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Service URLs" >> $GITHUB_STEP_SUMMARY
+          echo "- **API**: http://$PUBLIC_IP:5001" >> $GITHUB_STEP_SUMMARY
+          echo "- **Grafana**: http://$PUBLIC_IP:3000 (admin/grafana123)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Prometheus**: http://$PUBLIC_IP:9090" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status**: ❌ Deployment information not available" >> $GITHUB_STEP_SUMMARY
+        fi
 
   # Job 6: Notification and Cleanup (skip for PRs to non-main branches)
   notify:
