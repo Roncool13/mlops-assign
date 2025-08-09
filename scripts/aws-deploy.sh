@@ -255,7 +255,7 @@ deploy_via_user_data() {
     
     # Direct health check approach
     print_status "Checking API health directly..."
-    local max_wait=300  # 5 minutes
+    local max_wait=${HEALTH_CHECK_TIMEOUT:-300}  # seconds; configurable via env var
     local wait_time=0
     
     while [ $wait_time -lt $max_wait ]; do
