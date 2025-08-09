@@ -162,7 +162,7 @@ setup_ec2_instance() {
         INSTANCE_ID=$(aws ec2 run-instances \
             --image-id $AMI_ID \
             --count 1 \
-            --instance-type $INSTANCE_TYPE \
+            --instance-type $EC2_INSTANCE_TYPE \
             --key-name $KEY_NAME \
             --security-groups $SECURITY_GROUP \
             --user-data file://scripts/ec2-user-data.sh \
