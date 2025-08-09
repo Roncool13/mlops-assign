@@ -3,7 +3,7 @@
 A complete MLOps pipeline for predicting California housing prices using machine learning, featuring a production-ready REST API with interactive Swagger documentation, containerized deployment, and comprehensive monitoring.
 
 [![Python](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-2.3.3-green.svg)](https://fl## ⚡ Ne### 🚀 Production Deployment
+[![Flask](https://img.shields.io/badge/Flask-2.3.3-green.svg)](https://flask.palletsprojects.com/)
 
 ```bash
 # Docker Compose with multiple replicas
