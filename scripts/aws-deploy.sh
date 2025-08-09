@@ -232,7 +232,7 @@ deploy_via_user_data() {
         print_status "Waiting for command completion..."
         
         # Wait for command to complete
-        sleep 60
+        sleep $SSM_COMMAND_WAIT_TIME
         
         # Check command status
         COMMAND_STATUS=$(aws ssm get-command-invocation \
