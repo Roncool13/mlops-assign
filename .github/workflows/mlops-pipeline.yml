@@ -27,8 +27,8 @@ on:
 
 env:
   DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/california-housing-api
-  AWS_REGION: us-east-1
-  EC2_INSTANCE_TYPE: t3.medium
+  AWS_REGION: ${{ vars.AWS_REGION != '' && vars.AWS_REGION || 'us-east-1' }}
+  EC2_INSTANCE_TYPE: ${{ vars.EC2_INSTANCE_TYPE != '' && vars.EC2_INSTANCE_TYPE || 't3.medium' }}
 
 jobs:
   # Job 1: Lint and Test (runs on all events)
