@@ -160,7 +160,7 @@ jobs:
             # For initial commits or single commit repos, check if .dvc files exist and if they were updated in the latest commit
             if find . -name "*.dvc" -type f | grep -q .; then
               # Check if .dvc files were updated in the latest commit
-              if git show --name-only | grep -q '\.dvc$'; then
+              if git show --name-only HEAD | grep -q '\.dvc$'; then
                 echo "new_data=true" >> $GITHUB_OUTPUT
                 echo "🔄 Initial commit with .dvc file update detected, triggering retraining"
               else
