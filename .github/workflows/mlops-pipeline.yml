@@ -157,15 +157,20 @@ jobs:
               echo "✅ No .dvc update detected"
             fi
           else
-            # For initial commits or single commit repos, check if .dvc files exist
+            # For initial commits or single commit repos, check if .dvc files exist and if they were updated in the latest commit
             if find . -name "*.dvc" -type f | grep -q .; then
-              echo "new_data=true" >> $GITHUB_OUTPUT
-              echo "🔄 Initial commit with .dvc files detected, triggering retraining"
+              # Check if .dvc files were updated in the latest commit
+              if git show --name-only | grep -q '\.dvc$'; then
+                echo "new_data=true" >> $GITHUB_OUTPUT
+                echo "🔄 Initial commit with .dvc file update detected, triggering retraining"
+              else
+                echo "new_data=false" >> $GITHUB_OUTPUT
+                echo "✅ Initial commit, no .dvc file update detected"
+              fi
             else
               echo "new_data=false" >> $GITHUB_OUTPUT
               echo "✅ Initial commit, no .dvc files found"
             fi
-          fi
         fi
 
     - name: Retrain model if needed
