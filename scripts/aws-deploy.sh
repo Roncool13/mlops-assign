@@ -357,7 +357,11 @@ sudo yum update -y >/dev/null 2>&1 || true
 # Install Docker if not present
 if ! command -v docker &> /dev/null; then
     echo "🐳 Installing Docker..."
-    sudo yum install -y docker git >/dev/null 2>&1 || sudo dnf install -y docker git >/dev/null 2>&1 || true
+    sudo yum install -y docker git >/dev/null 2>&1 || sudo dnf install -y docker git >/dev/null 2>&1
+    if ! command -v docker &> /dev/null || ! command -v git &> /dev/null; then
+        echo "❌ Failed to install Docker and/or Git. Aborting deployment."
+        exit 1
+    fi
     sudo service docker start || sudo systemctl start docker
     sudo usermod -a -G docker ec2-user || true
     echo "✅ Docker installed and started"
