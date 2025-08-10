@@ -448,7 +448,7 @@ deploy_to_ec2() {
                 -o UserKnownHostsFile=/dev/null \
                 -o PasswordAuthentication=no \
                 -o LogLevel=VERBOSE \
-                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'" 2>&1)
+                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'")
             
             if echo "$ssh_result" | grep -q "SSH_CONNECTION_SUCCESS"; then
                 print_success "SSH connection established!"
@@ -466,7 +466,7 @@ deploy_to_ec2() {
                 -o UserKnownHostsFile=/dev/null \
                 -o PasswordAuthentication=no \
                 -o LogLevel=ERROR \
-                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'" >/dev/null 2>&1; then
+                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'"; then
                 print_success "SSH connection established!"
                 ssh_success=true
                 break
