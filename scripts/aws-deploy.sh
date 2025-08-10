@@ -146,7 +146,7 @@ create_key_pair() {
             fi
             
             # Verify deletion was successful
-            sleep 2  # Brief pause to ensure AWS consistency
+            aws ec2 wait key-pair-deleted --key-names $KEY_NAME --region $AWS_REGION
             if aws ec2 describe-key-pairs --key-names $KEY_NAME --region $AWS_REGION >/dev/null 2>&1; then
                 print_error "Key pair still exists in AWS after deletion attempt"
                 print_error "Please delete $KEY_NAME manually in AWS Console and retry"
