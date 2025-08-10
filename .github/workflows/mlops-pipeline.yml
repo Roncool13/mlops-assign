@@ -138,7 +138,7 @@ jobs:
     - name: Check for new data
       id: check_data
       run: |
-        # Simulate checking for new data (replace with actual data source check)
+        # Simulate checking for new data
         echo "Checking for new data..."
 
         # Check if forced retraining is requested
@@ -171,6 +171,7 @@ jobs:
               echo "new_data=false" >> $GITHUB_OUTPUT
               echo "✅ Initial commit, no .dvc files found"
             fi
+          fi
         fi
 
     - name: Retrain model if needed
