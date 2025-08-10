@@ -224,7 +224,8 @@ jobs:
     if: |
       always() &&
       needs.lint-and-test.result == 'success' &&
-      github.event_name != 'pull_request'
+      github.event_name != 'pull_request' &&
+      needs.check-data-and-retrain.outputs.model_updated == 'true'
     outputs:
       image_tag: ${{ steps.tags.outputs.image_tag }}
       version: ${{ steps.tags.outputs.version }}
@@ -233,8 +234,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Download model artifacts (if updated)
-      if: needs.check-data-and-retrain.outputs.model_updated == 'true'
+    - name: Download model artifacts
       uses: actions/download-artifact@v4
       with:
         name: trained-models-${{ needs.check-data-and-retrain.outputs.model_version }}
