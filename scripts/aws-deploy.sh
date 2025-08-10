@@ -106,7 +106,7 @@ create_key_pair() {
     fi
     
     # Check if key pair exists in AWS
-    if aws ec2 describe-key-pairs --key-names $KEY_NAME --region $AWS_REGION >/dev/null 2>&1; then
+    if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region $AWS_REGION >/dev/null 2>&1; then
         print_warning "Key pair $KEY_NAME already exists in AWS"
         
         # Check if we have the private key locally
