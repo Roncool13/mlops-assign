@@ -153,7 +153,7 @@ jobs:
           if [ $(git rev-list --count HEAD) -gt 1 ]; then
             UPDATED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.dvc$' || true)
             echo "Updated .dvc files: $UPDATED_FILES"
-            if git diff --name-only HEAD~1 HEAD | grep '\.dvc$'; then
+            if [ -n "$UPDATED_FILES" ]; then
               echo "new_data=true" >> $GITHUB_OUTPUT
               echo "🔄 .dvc file updated in latest commit, triggering retraining"
             else
