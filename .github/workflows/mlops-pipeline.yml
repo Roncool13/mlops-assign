@@ -29,6 +29,7 @@ env:
   DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/california-housing-api
   AWS_REGION: ${{ vars.AWS_REGION != '' && vars.AWS_REGION || 'us-east-1' }}
   EC2_INSTANCE_TYPE: ${{ vars.EC2_INSTANCE_TYPE != '' && vars.EC2_INSTANCE_TYPE || 't3.medium' }}
+  DEPLOY_TARGET: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_target) || (startsWith(github.ref, 'refs/heads/main') && 'aws') || (startsWith(github.ref, 'refs/heads/develop') && 'both') || (startsWith(github.ref, 'refs/heads/feature/') && 'local') || 'local' }}
 
 jobs:
   # Job 1: Lint and Test (runs on all events)
@@ -276,9 +277,7 @@ jobs:
       always() &&
       needs.build-and-push.result == 'success' &&
       github.event_name != 'pull_request' &&
-      (github.event.inputs.deploy_target == 'local' ||
-       github.event.inputs.deploy_target == 'both' ||
-       github.event.inputs.deploy_target == '')
+      (env.DEPLOY_TARGET == 'local' || env.DEPLOY_TARGET == 'both')
 
     steps:
     - name: Checkout code
@@ -313,8 +312,7 @@ jobs:
       always() &&
       needs.build-and-push.result == 'success' &&
       github.event_name != 'pull_request' &&
-      (github.event.inputs.deploy_target == 'aws' ||
-       github.event.inputs.deploy_target == 'both')
+      (env.DEPLOY_TARGET == 'aws' || env.DEPLOY_TARGET == 'both')
 
     steps:
     - name: Checkout code
