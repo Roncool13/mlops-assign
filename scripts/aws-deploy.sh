@@ -410,10 +410,81 @@ deploy_to_ec2() {
         
         echo "  Local key fingerprint: $LOCAL_KEY_FINGERPRINT"
         echo "  AWS key fingerprint: $AWS_KEY_FINGERPRINT"
+        echo "  Note: Different fingerprint formats are normal (private vs public key)"
+    fi
+    
+    # Comprehensive network and security troubleshooting
+    print_status "Performing network and security troubleshooting..."
+    
+    # Check if we can reach the instance on port 22
+    echo "  Testing network connectivity to $PUBLIC_IP:22..."
+    if timeout 5 bash -c "</dev/tcp/$PUBLIC_IP/22" >/dev/null 2>&1; then
+        echo "  ✅ Port 22 is reachable"
+    else
+        print_error "❌ Port 22 is NOT reachable - this is likely a security group issue"
+        print_error "Please check that your security group allows SSH (port 22) from your current IP"
         
-        if [ "$LOCAL_KEY_FINGERPRINT" != "unknown" ] && [ "$AWS_KEY_FINGERPRINT" != "unknown" ] && [ "$LOCAL_KEY_FINGERPRINT" != "$AWS_KEY_FINGERPRINT" ]; then
-            print_warning "Key fingerprints don't match! This may cause SSH failures."
-        fi
+        # Get current public IP
+        CURRENT_IP=$(curl -s http://checkip.amazonaws.com/ || curl -s http://ipinfo.io/ip || echo "unknown")
+        echo "  Your current public IP: $CURRENT_IP"
+        
+        # Check security group rules
+        print_status "Checking security group SSH rules..."
+        aws ec2 describe-security-groups \
+            --group-names "$SECURITY_GROUP" \
+            --region "$AWS_REGION" \
+            --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`]' \
+            --output table || echo "  Could not retrieve security group rules"
+        
+        print_error "Network connectivity failed. Please:"
+        print_error "  1. Check security group allows SSH from your IP ($CURRENT_IP)"
+        print_error "  2. Verify instance has a public IP: $PUBLIC_IP"
+        print_error "  3. Check if AWS region firewall rules block SSH"
+        
+        print_status "Attempting alternative deployment via SSM..."
+        deploy_via_user_data
+        return 0
+    fi
+    
+    # Verify the instance actually has our key pair assigned
+    print_status "Verifying instance key pair assignment..."
+    INSTANCE_KEY=$(aws ec2 describe-instances \
+        --instance-ids "$INSTANCE_ID" \
+        --region "$AWS_REGION" \
+        --query 'Reservations[0].Instances[0].KeyName' \
+        --output text 2>/dev/null || echo "unknown")
+    
+    echo "  Instance key pair: $INSTANCE_KEY"
+    echo "  Expected key pair: $KEY_NAME"
+    
+    if [ "$INSTANCE_KEY" != "$KEY_NAME" ]; then
+        print_error "❌ Key pair mismatch!"
+        print_error "Instance was launched with key '$INSTANCE_KEY' but we have '$KEY_NAME'"
+        print_error "This will definitely cause SSH authentication failures"
+        
+        print_status "Attempting alternative deployment via SSM..."
+        deploy_via_user_data
+        return 0
+    else
+        echo "  ✅ Key pair assignment matches"
+    fi
+    
+    # Check if instance is in the right security group
+    print_status "Verifying instance security groups..."
+    INSTANCE_SG=$(aws ec2 describe-instances \
+        --instance-ids "$INSTANCE_ID" \
+        --region "$AWS_REGION" \
+        --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupName' \
+        --output text 2>/dev/null || echo "unknown")
+    
+    echo "  Instance security group: $INSTANCE_SG"
+    echo "  Expected security group: $SECURITY_GROUP"
+    
+    if [ "$INSTANCE_SG" != "$SECURITY_GROUP" ]; then
+        print_warning "⚠️  Security group mismatch!"
+        print_warning "Instance is in '$INSTANCE_SG' but we expected '$SECURITY_GROUP'"
+    else
+        echo "  ✅ Security group assignment matches"
     fi
     
     # Wait for instance to be fully ready
@@ -430,9 +501,9 @@ deploy_to_ec2() {
         print_warning "System status check timeout (this is often normal), continuing with SSH attempts..."
     }
     
-    # Wait for SSH service to be ready with enhanced error handling
+        # Wait for SSH service to be ready with enhanced error handling
     print_status "Testing SSH connectivity to ec2-user@$PUBLIC_IP..."
-    local max_attempts=20
+    local max_attempts=10  # Reduced attempts since we have better diagnostics now
     local attempt=1
     local ssh_success=false
     
@@ -442,39 +513,71 @@ deploy_to_ec2() {
         # Test SSH connection with detailed error output for first few attempts
         ssh_result=""
         if [ $attempt -le 3 ]; then
-            ssh_result=$(ssh -i "$SSH_KEY_PATH" \
-                -o ConnectTimeout=15 \
-                -o StrictHostKeyChecking=no \
-                -o UserKnownHostsFile=/dev/null \
-                -o PasswordAuthentication=no \
-                -o LogLevel=VERBOSE \
-                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'")
+            print_status "Running verbose SSH attempt for detailed diagnostics..."
+            ssh_result=$(ssh -i "$SSH_KEY_PATH" 
+                -o ConnectTimeout=10 
+                -o StrictHostKeyChecking=no 
+                -o UserKnownHostsFile=/dev/null 
+                -o PasswordAuthentication=no 
+                -o PubkeyAuthentication=yes 
+                -o LogLevel=DEBUG1 
+                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'" 2>&1)
             
             if echo "$ssh_result" | grep -q "SSH_CONNECTION_SUCCESS"; then
                 print_success "SSH connection established!"
                 ssh_success=true
                 break
             else
-                print_warning "SSH attempt $attempt failed with output:"
-                echo "$ssh_result" | grep -E "(Permission denied|Connection refused|Connection timed out|Host key verification failed)" | head -5
+                print_warning "SSH attempt $attempt failed. Key diagnostic info:"
+                
+                # Extract useful debugging information
+                if echo "$ssh_result" | grep -q "Connection refused"; then
+                    echo "  ❌ Connection refused - SSH service may not be running"
+                elif echo "$ssh_result" | grep -q "Connection timed out"; then
+                    echo "  ❌ Connection timed out - network/firewall issue"
+                elif echo "$ssh_result" | grep -q "Permission denied (publickey"; then
+                    echo "  ❌ Public key authentication failed"
+                    echo "     - Key may not be properly installed on instance"
+                    echo "     - Key format may be incorrect"
+                    echo "     - Instance may have been launched with different key"
+                elif echo "$ssh_result" | grep -q "Host key verification failed"; then
+                    echo "  ❌ Host key verification failed"
+                else
+                    echo "  ❌ Other SSH error occurred"
+                fi
+                
+                # Show relevant debug lines
+                echo "  Debug info:"
+                echo "$ssh_result" | grep -E "(debug1|Permission denied|Connection|Offering public key)" | head -3 | sed 's/^/    /'
             fi
         else
             # Silent attempts for later tries to reduce noise
-            if ssh -i "$SSH_KEY_PATH" \
-                -o ConnectTimeout=15 \
-                -o StrictHostKeyChecking=no \
-                -o UserKnownHostsFile=/dev/null \
-                -o PasswordAuthentication=no \
-                -o LogLevel=ERROR \
-                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'"; then
+            if ssh -i "$SSH_KEY_PATH" 
+                -o ConnectTimeout=10 
+                -o StrictHostKeyChecking=no 
+                -o UserKnownHostsFile=/dev/null 
+                -o PasswordAuthentication=no 
+                -o LogLevel=ERROR 
+                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'" >/dev/null 2>&1; then
                 print_success "SSH connection established!"
                 ssh_success=true
                 break
             fi
         fi
         
-        echo -ne "\r${BLUE}[INFO]${NC} Waiting for SSH... (${attempt}/${max_attempts}, waiting 15s)"
-        sleep 15
+        if [ $attempt -eq 3 ]; then
+            print_status "💡 Troubleshooting suggestions after 3 failed attempts:"
+            echo "  1. Manual test: ssh -i $SSH_KEY_PATH -v ec2-user@$PUBLIC_IP"
+            echo "  2. Check instance console logs in AWS Console for boot issues"
+            echo "  3. Verify your security group allows SSH from your IP"
+            echo "  4. Try connecting from AWS EC2 Instance Connect (browser-based SSH)"
+            echo ""
+            print_status "Continuing with remaining attempts..."
+        fi
+        
+        echo -ne "
+${BLUE}[INFO]${NC} Waiting for SSH... (${attempt}/${max_attempts}, waiting 20s)"
+        sleep 20
         ((attempt++))
     done
     
