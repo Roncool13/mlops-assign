@@ -162,9 +162,9 @@ jobs:
             fi
           else
             # For initial commits, check if .dvc files are part of the commit
-            INITIAL_CHECK=$(git show --name-only HEAD | grep '\.dvc$' )
+            INITIAL_CHECK=$(git diff-tree --no-commit-id --name-only -r HEAD | grep '\.dvc$' )
             echo "Initial commit check result: $INITIAL_CHECK"
-            if git show --name-only HEAD | grep '\.dvc$'; then
+            if git diff-tree --no-commit-id --name-only -r HEAD | grep '\.dvc$'; then
               echo "new_data=true" >> $GITHUB_OUTPUT
               echo "🔄 Initial commit contains .dvc files, triggering retraining"
             else
