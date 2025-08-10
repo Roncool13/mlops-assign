@@ -136,7 +136,7 @@ create_key_pair() {
             
             # Delete existing key pair from AWS with error handling
             if aws ec2 delete-key-pair \
-                --key-name $KEY_NAME \
+                --key-name "$KEY_NAME" \
                 --region $AWS_REGION >/dev/null 2>&1; then
                 print_success "Existing key pair deleted from AWS"
             else
