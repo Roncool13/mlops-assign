@@ -514,13 +514,13 @@ deploy_to_ec2() {
         ssh_result=""
         if [ $attempt -le 3 ]; then
             print_status "Running verbose SSH attempt for detailed diagnostics..."
-            ssh_result=$(ssh -i "$SSH_KEY_PATH" 
-                -o ConnectTimeout=10 
-                -o StrictHostKeyChecking=no 
-                -o UserKnownHostsFile=/dev/null 
-                -o PasswordAuthentication=no 
-                -o PubkeyAuthentication=yes 
-                -o LogLevel=DEBUG1 
+            ssh_result=$(ssh -i "$SSH_KEY_PATH" \
+                -o ConnectTimeout=10 \
+                -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                -o PasswordAuthentication=no \
+                -o PubkeyAuthentication=yes \
+                -o LogLevel=DEBUG1 \
                 ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'" 2>&1)
             
             if echo "$ssh_result" | grep -q "SSH_CONNECTION_SUCCESS"; then
@@ -552,12 +552,12 @@ deploy_to_ec2() {
             fi
         else
             # Silent attempts for later tries to reduce noise
-            if ssh -i "$SSH_KEY_PATH" 
-                -o ConnectTimeout=10 
-                -o StrictHostKeyChecking=no 
-                -o UserKnownHostsFile=/dev/null 
-                -o PasswordAuthentication=no 
-                -o LogLevel=ERROR 
+            if ssh -i "$SSH_KEY_PATH" \
+                -o ConnectTimeout=10 \
+                -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                -o PasswordAuthentication=no \
+                -o LogLevel=ERROR \
                 ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'" >/dev/null 2>&1; then
                 print_success "SSH connection established!"
                 ssh_success=true
