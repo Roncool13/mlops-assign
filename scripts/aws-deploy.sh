@@ -476,7 +476,6 @@ show_status() {
         echo "  ssh -i $SSH_KEY_PATH $EIC_OS_USER@$PUBLIC_IP"
       else
         echo "  Legacy key not available locally"
-      }
     fi
   fi
 }
