@@ -350,99 +350,271 @@ deploy_to_ec2() {
     
     print_status "Deploying application to EC2 instance: $INSTANCE_ID"
     
-    # Check if SSH key exists
+    # Determine SSH key path safely
     if [ -n "$HOME" ] && [ -d "$HOME" ]; then
         SSH_KEY_PATH="$HOME/.ssh/$KEY_NAME.pem"
     else
         SSH_KEY_PATH=~/.ssh/$KEY_NAME.pem
+        print_warning "HOME environment variable not set, using tilde expansion"
     fi
+    
+    # Debug SSH key information
+    print_status "SSH Key Debug Information:"
+    echo "  Key Name: $KEY_NAME"
+    echo "  Key Path: $SSH_KEY_PATH"
+    echo "  Key exists: $([ -f "$SSH_KEY_PATH" ] && echo "Yes" || echo "No")"
+    echo "  Instance IP: $PUBLIC_IP"
     
     if [ ! -f "$SSH_KEY_PATH" ]; then
         print_warning "SSH key not found at $SSH_KEY_PATH. This is normal in CI/CD environments."
-        print_status "Using EC2 Instance Connect or user data for deployment..."
-        
-        # Alternative deployment using AWS Systems Manager or user data
+        print_status "Using alternative deployment method..."
         deploy_via_user_data
         return 0
     fi
     
-    # Wait for SSH to be available
-    print_status "Waiting for SSH to be available..."
-    local max_attempts=30
-    local attempt=1
+    # Check and fix SSH key permissions
+    current_perms=$(ls -l "$SSH_KEY_PATH" | awk '{print $1}')
+    echo "  Current permissions: $current_perms"
     
-    while [ $attempt -le $max_attempts ]; do
-        if ssh -i "$SSH_KEY_PATH" -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP "echo 'SSH Connected'"; then
-            print_success "SSH connection established"
-            break
-        fi
-        echo -ne "\r${BLUE}[INFO]${NC} Attempt $attempt/$max_attempts - waiting for SSH..."
-        sleep 10
-        ((attempt++))
-    done
+    if [ "$current_perms" != "-r--------" ]; then
+        print_status "Fixing SSH key permissions..."
+        chmod 400 "$SSH_KEY_PATH"
+        echo "  New permissions: $(ls -l "$SSH_KEY_PATH" | awk '{print $1}')"
+    fi
     
-    if [ $attempt -gt $max_attempts ]; then
-        print_error "SSH connection failed after $max_attempts attempts"
+    # Check key file content
+    key_size=$(wc -c < "$SSH_KEY_PATH" 2>/dev/null || echo "0")
+    echo "  Key file size: $key_size bytes"
+    
+    if [ "$key_size" -lt 100 ]; then
+        print_error "SSH key file appears to be empty or corrupted"
         print_status "Falling back to user data deployment..."
         deploy_via_user_data
         return 0
     fi
     
-    # Deploy application
-    print_status "Deploying application..."
-    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP << 'EOF'
-        # Update system and install dependencies
-        sudo yum update -y
-        
-        # Install Docker if not present
-        if ! command -v docker &> /dev/null; then
-            sudo yum install -y docker git
-            sudo service docker start
-            sudo usermod -a -G docker ec2-user
-            # Re-login to apply group changes
-            sudo su - ec2-user -c "echo 'Docker installed and user added to docker group'"
-        fi
-        
-        # Install Docker Compose if not present
-        if ! command -v docker-compose &> /dev/null; then
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-        fi
-        
-        # Clone or update repository
-        cd /home/ec2-user
-        if [ -d "california-housing-api" ]; then
-            cd california-housing-api
-            git pull
-        else
-            git clone https://github.com/Roncool13/mlops-assign.git california-housing-api
-            cd california-housing-api
-        fi
-        
-        # Start Docker service (in case it's not running)
-        sudo service docker start
-        
-        # Deploy application
-        docker-compose pull || true
-        docker-compose down || true
-        docker-compose up -d
-        
-        # Wait for services to start
-        sleep 30
-        
-        # Test deployment
-        if curl -f http://localhost:5001/api/v1/health/; then
-            echo "✅ Deployment successful - API is healthy"
-        else
-            echo "❌ Deployment may have issues - API health check failed"
-            exit 1
-        fi
-EOF
+    # Verify key format
+    if ! head -1 "$SSH_KEY_PATH" | grep -q "BEGIN.*PRIVATE KEY"; then
+        print_error "SSH key file doesn't appear to be in correct format"
+        print_status "First line of key: $(head -1 "$SSH_KEY_PATH")"
+        print_status "Falling back to user data deployment..."
+        deploy_via_user_data
+        return 0
+    fi
     
-    print_success "Application deployed successfully!"
-    print_status "Access your application at: http://$PUBLIC_IP:5001"
-    print_status "Grafana dashboard: http://$PUBLIC_IP:3000"
-    print_status "Prometheus: http://$PUBLIC_IP:9090"
+    # Verify key pair consistency between local and AWS
+    print_status "Verifying key pair consistency..."
+    if command -v ssh-keygen >/dev/null 2>&1; then
+        LOCAL_KEY_FINGERPRINT=$(ssh-keygen -l -f "$SSH_KEY_PATH" 2>/dev/null | awk '{print $2}' || echo "unknown")
+        AWS_KEY_FINGERPRINT=$(aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region "$AWS_REGION" --query 'KeyPairs[0].KeyFingerprint' --output text 2>/dev/null || echo "unknown")
+        
+        echo "  Local key fingerprint: $LOCAL_KEY_FINGERPRINT"
+        echo "  AWS key fingerprint: $AWS_KEY_FINGERPRINT"
+        
+        if [ "$LOCAL_KEY_FINGERPRINT" != "unknown" ] && [ "$AWS_KEY_FINGERPRINT" != "unknown" ] && [ "$LOCAL_KEY_FINGERPRINT" != "$AWS_KEY_FINGERPRINT" ]; then
+            print_warning "Key fingerprints don't match! This may cause SSH failures."
+        fi
+    fi
+    
+    # Wait for instance to be fully ready
+    print_status "Ensuring instance is fully initialized..."
+    
+    # Wait for instance to be running first
+    aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" 2>/dev/null || {
+        print_warning "Instance-running wait timeout, but continuing..."
+    }
+    
+    # Wait for system status checks
+    print_status "Waiting for system status checks to pass..."
+    timeout 300 aws ec2 wait system-status-ok --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" 2>/dev/null || {
+        print_warning "System status check timeout (this is often normal), continuing with SSH attempts..."
+    }
+    
+    # Wait for SSH service to be ready with enhanced error handling
+    print_status "Testing SSH connectivity to ec2-user@$PUBLIC_IP..."
+    local max_attempts=20
+    local attempt=1
+    local ssh_success=false
+    
+    while [ $attempt -le $max_attempts ]; do
+        print_status "SSH attempt $attempt/$max_attempts..."
+        
+        # Test SSH connection with detailed error output for first few attempts
+        ssh_result=""
+        if [ $attempt -le 3 ]; then
+            ssh_result=$(ssh -i "$SSH_KEY_PATH" \
+                -o ConnectTimeout=15 \
+                -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                -o PasswordAuthentication=no \
+                -o LogLevel=VERBOSE \
+                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'" 2>&1)
+            
+            if echo "$ssh_result" | grep -q "SSH_CONNECTION_SUCCESS"; then
+                print_success "SSH connection established!"
+                ssh_success=true
+                break
+            else
+                print_warning "SSH attempt $attempt failed with output:"
+                echo "$ssh_result" | grep -E "(Permission denied|Connection refused|Connection timed out|Host key verification failed)" | head -5
+            fi
+        else
+            # Silent attempts for later tries to reduce noise
+            if ssh -i "$SSH_KEY_PATH" \
+                -o ConnectTimeout=15 \
+                -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                -o PasswordAuthentication=no \
+                -o LogLevel=ERROR \
+                ec2-user@$PUBLIC_IP "echo 'SSH_CONNECTION_SUCCESS'" >/dev/null 2>&1; then
+                print_success "SSH connection established!"
+                ssh_success=true
+                break
+            fi
+        fi
+        
+        echo -ne "\r${BLUE}[INFO]${NC} Waiting for SSH... (${attempt}/${max_attempts}, waiting 15s)"
+        sleep 15
+        ((attempt++))
+    done
+    
+    if [ "$ssh_success" = "false" ]; then
+        print_error "SSH connection failed after $max_attempts attempts"
+        print_error "Common troubleshooting steps:"
+        print_error "  1. Check security group allows SSH (port 22) from your IP"
+        print_error "  2. Verify instance is fully booted (may take 2-3 minutes)"
+        print_error "  3. Confirm key pair was created properly in AWS"
+        print_error "  4. Try connecting manually: ssh -i $SSH_KEY_PATH ec2-user@$PUBLIC_IP"
+        
+        print_status "Attempting alternative deployment via SSM/User Data..."
+        deploy_via_user_data
+        return 0
+    fi
+    
+    # Test basic SSH commands before full deployment
+    print_status "Testing SSH command execution..."
+    if ! ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no -o ConnectTimeout=10 ec2-user@$PUBLIC_IP "whoami && uname -a" >/dev/null 2>&1; then
+        print_error "SSH command execution test failed"
+        print_status "Falling back to user data deployment..."
+        deploy_via_user_data
+        return 0
+    fi
+    
+    # Deploy application via SSH
+    print_status "Deploying application via SSH..."
+    if ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP << 'EOF'
+set -e  # Exit on any error
+
+echo "🚀 Starting deployment on EC2 instance..."
+
+# Update system packages
+echo "📦 Updating system packages..."
+sudo yum update -y >/dev/null 2>&1
+
+# Install Docker if not present
+if ! command -v docker &> /dev/null; then
+    echo "🐳 Installing Docker..."
+    sudo yum install -y docker git >/dev/null 2>&1
+    sudo service docker start
+    sudo usermod -a -G docker ec2-user
+    echo "✅ Docker installed and started"
+else
+    echo "✅ Docker already installed"
+    sudo service docker start  # Ensure it's running
+fi
+
+# Install Docker Compose if not present
+if ! command -v docker-compose &> /dev/null; then
+    echo "🔧 Installing Docker Compose..."
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+        -o /usr/local/bin/docker-compose >/dev/null 2>&1
+    sudo chmod +x /usr/local/bin/docker-compose
+    echo "✅ Docker Compose installed"
+else
+    echo "✅ Docker Compose already installed"
+fi
+
+# Clone or update repository
+echo "📥 Setting up application repository..."
+cd /home/ec2-user
+
+if [ -d "california-housing-api" ]; then
+    echo "🔄 Updating existing repository..."
+    cd california-housing-api
+    git pull origin main >/dev/null 2>&1 || git pull >/dev/null 2>&1
+else
+    echo "📥 Cloning repository..."
+    git clone https://github.com/Roncool13/mlops-assign.git california-housing-api >/dev/null 2>&1
+    cd california-housing-api
+fi
+
+echo "✅ Repository ready"
+
+# Ensure Docker is running and user has permissions
+sudo service docker start
+sleep 5
+
+# Deploy application using Docker Compose
+echo "🚀 Deploying application containers..."
+
+# Stop existing containers
+echo "🛑 Stopping existing containers..."
+docker-compose down >/dev/null 2>&1 || true
+
+# Pull latest images
+echo "📥 Pulling latest container images..."
+docker-compose pull >/dev/null 2>&1 || {
+    echo "⚠️  Image pull failed, using local images"
+}
+
+# Start application
+echo "🚀 Starting application containers..."
+docker-compose up -d
+
+# Wait for services to initialize
+echo "⏳ Waiting for services to start (30 seconds)..."
+sleep 30
+
+# Health check
+echo "🏥 Performing health check..."
+for i in {1..6}; do
+    if curl -f -s http://localhost:5001/api/v1/health/ >/dev/null 2>&1; then
+        echo "✅ Application is healthy and running!"
+        echo "🌐 API accessible at: http://localhost:5001"
+        echo "📊 Services deployed successfully!"
+        exit 0
+    fi
+    echo "⏳ Health check attempt $i/6..."
+    sleep 10
+done
+
+echo "⚠️  Health check timeout - application may still be starting"
+echo "📋 Container status:"
+docker-compose ps
+
+exit 1
+EOF
+    then
+        print_success "Application deployed successfully via SSH!"
+        print_status "🌐 Access your services:"
+        print_status "  📊 API: http://$PUBLIC_IP:5001"
+        print_status "  📈 Grafana: http://$PUBLIC_IP:3000 (admin/grafana123)"
+        print_status "  🔍 Prometheus: http://$PUBLIC_IP:9090"
+        
+        # Final health check from outside
+        print_status "Performing external health check..."
+        sleep 10
+        if curl -f -s "http://$PUBLIC_IP:5001/api/v1/health/" >/dev/null 2>&1; then
+            print_success "✅ External health check passed!"
+        else
+            print_warning "⚠️  External health check failed - services may still be starting"
+            print_status "Please wait a few minutes and check manually"
+        fi
+    else
+        print_error "SSH deployment failed"
+        print_status "Attempting fallback deployment via SSM/User Data..."
+        deploy_via_user_data
+    fi
 }
 
 # Function to show deployment status
