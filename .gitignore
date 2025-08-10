@@ -60,3 +60,6 @@ aws-deployment.env
 
 # Custom scripts
 scripts/prepare-commit.sh
+
+# Backup files
+*/backup/
