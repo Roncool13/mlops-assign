@@ -8,7 +8,7 @@ set -e
 # Configuration
 AWS_REGION=${AWS_REGION:-us-east-2}
 EC2_INSTANCE_TYPE=${EC2_INSTANCE_TYPE:-t3.medium}
-KEY_NAME=${AWS_KEY_NAME:-mlops-keypair}
+KEY_NAME=${AWS_KEY_NAME:-mlops-keypair-$(date +%Y%m%d%H%M%S)}
 SECURITY_GROUP=${AWS_SECURITY_GROUP:-mlops-sg}
 INSTANCE_NAME=${INSTANCE_NAME:-mlops-california-housing}
 
