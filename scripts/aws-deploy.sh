@@ -116,28 +116,11 @@ create_key_pair() {
         else
             print_warning "Private key not found locally at $SSH_KEY_PATH"
             print_status "Deleting existing key pair and creating new one..."
-
-            # Brief pause to ensure AWS consistency
-            # Wait for key pair to be deleted in AWS with exponential backoff (max 5 attempts, up to ~10s total)
-            MAX_RETRIES=5
-            RETRY_DELAY=2
-            ATTEMPT=1
-            while aws ec2 describe-key-pairs --key-names $KEY_NAME --region $AWS_REGION >/dev/null 2>&1; do
-                if [ $ATTEMPT -ge $MAX_RETRIES ]; then
-                    print_error "Key pair $KEY_NAME still exists in AWS after $MAX_RETRIES attempts"
-                    print_error "Please delete $KEY_NAME manually in AWS Console and retry"
-                    return 1
-                fi
-                print_status "Waiting for key pair $KEY_NAME to be deleted in AWS (attempt $ATTEMPT)..."
-                sleep $RETRY_DELAY
-                ATTEMPT=$((ATTEMPT + 1))
-                RETRY_DELAY=$((RETRY_DELAY * 2))
-            done
             
             # Delete existing key pair from AWS with error handling
             if aws ec2 delete-key-pair \
                 --key-name "$KEY_NAME" \
-                --region $AWS_REGION >/dev/null 2>&1; then
+                --region $AWS_REGION; then
                 print_success "Existing key pair deleted from AWS"
             else
                 print_error "Failed to delete existing key pair from AWS"
