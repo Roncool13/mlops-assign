@@ -33,7 +33,7 @@ check_aws_setup() {
         exit 1
     fi
     
-    if ! aws sts get-caller-identity >/dev/null 2>&1; then
+    if ! aws sts get-caller-identity; then
         print_error "AWS credentials not configured. Please run 'aws configure'"
         exit 1
     fi
@@ -45,7 +45,7 @@ check_aws_setup() {
 create_security_group() {
     print_status "Creating security group: $SECURITY_GROUP"
     
-    if aws ec2 describe-security-groups --group-names $SECURITY_GROUP --region $AWS_REGION >/dev/null 2>&1; then
+    if aws ec2 describe-security-groups --group-names $SECURITY_GROUP --region $AWS_REGION; then
         print_warning "Security group $SECURITY_GROUP already exists"
         return 0
     fi
@@ -106,7 +106,7 @@ create_key_pair() {
     fi
     
     # Check if key pair exists in AWS
-    if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region $AWS_REGION >/dev/null 2>&1; then
+    if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region $AWS_REGION; then
         print_warning "Key pair $KEY_NAME already exists in AWS"
         
         # Check if we have the private key locally
@@ -128,12 +128,16 @@ create_key_pair() {
                 return 1
             fi
             
-            # Verify deletion was successful
-            aws ec2 wait key-pair-deleted --key-names $KEY_NAME --region $AWS_REGION
-            if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region $AWS_REGION >/dev/null 2>&1; then
+            # Verify deletion was successful using AWS waiter (inverse logic)
+            print_status "Verifying key pair deletion..."
+            if timeout 30 aws ec2 wait key-pair-exists --key-names "$KEY_NAME" --region $AWS_REGION; then
+                # If wait succeeds, key pair still exists - deletion failed
                 print_error "Key pair still exists in AWS after deletion attempt"
                 print_error "Please delete $KEY_NAME manually in AWS Console and retry"
                 return 1
+            else
+                # If wait fails/times out, key pair doesn't exist - deletion succeeded
+                print_success "Key pair deletion confirmed"
             fi
         fi
     fi
@@ -315,8 +319,8 @@ deploy_via_user_data() {
     while [ $wait_time -lt $max_wait ]; do
         sleep 15
         wait_time=$((wait_time + 15))
-        
-        if curl -f "http://$PUBLIC_IP:5001/api/v1/health/" >/dev/null 2>&1; then
+
+        if curl -f "http://$PUBLIC_IP:5001/api/v1/health/"; then
             print_success "Deployment completed successfully!"
             print_status "Services available:"
             print_status "  API: http://$PUBLIC_IP:5001"
@@ -368,7 +372,7 @@ deploy_to_ec2() {
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        if ssh -i "$SSH_KEY_PATH" -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP "echo 'SSH Connected'" >/dev/null 2>&1; then
+        if ssh -i "$SSH_KEY_PATH" -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP "echo 'SSH Connected'"; then
             print_success "SSH connection established"
             break
         fi
@@ -427,7 +431,7 @@ deploy_to_ec2() {
         sleep 30
         
         # Test deployment
-        if curl -f http://localhost:5001/api/v1/health/ >/dev/null 2>&1; then
+        if curl -f http://localhost:5001/api/v1/health/; then
             echo "✅ Deployment successful - API is healthy"
         else
             echo "❌ Deployment may have issues - API health check failed"
