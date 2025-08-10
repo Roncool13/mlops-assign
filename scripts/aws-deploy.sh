@@ -94,16 +94,34 @@ create_security_group() {
 create_key_pair() {
     print_status "Checking key pair: $KEY_NAME"
     
+    # Check if key pair exists in AWS
     if aws ec2 describe-key-pairs --key-names $KEY_NAME --region $AWS_REGION >/dev/null 2>&1; then
-        print_warning "Key pair $KEY_NAME already exists"
-        return 0
+        print_warning "Key pair $KEY_NAME already exists in AWS"
+        
+        # Check if we have the private key locally
+        SSH_KEY_PATH="$HOME/.ssh/$KEY_NAME.pem"
+        if [ -f "$SSH_KEY_PATH" ]; then
+            print_status "Private key found locally at $SSH_KEY_PATH"
+            return 0
+        else
+            print_warning "Private key not found locally at $SSH_KEY_PATH"
+            print_status "Deleting existing key pair and creating new one..."
+            
+            # Delete existing key pair from AWS
+            aws ec2 delete-key-pair \
+                --key-name $KEY_NAME \
+                --region $AWS_REGION
+            
+            print_success "Existing key pair deleted from AWS"
+        fi
     fi
     
-    print_status "Creating key pair: $KEY_NAME"
+    print_status "Creating new key pair: $KEY_NAME"
     
     # Ensure .ssh directory exists
     mkdir -p ~/.ssh
     
+    # Create new key pair
     aws ec2 create-key-pair \
         --key-name $KEY_NAME \
         --region $AWS_REGION \
