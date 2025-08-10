@@ -94,12 +94,22 @@ create_security_group() {
 create_key_pair() {
     print_status "Checking key pair: $KEY_NAME"
     
+    # Determine SSH directory and key path safely
+    if [ -n "$HOME" ] && [ -d "$HOME" ]; then
+        SSH_DIR="$HOME/.ssh"
+        SSH_KEY_PATH="$HOME/.ssh/$KEY_NAME.pem"
+    else
+        # Fallback to current user's home directory
+        SSH_DIR=~/.ssh
+        SSH_KEY_PATH=~/.ssh/$KEY_NAME.pem
+        print_warning "HOME environment variable not set or invalid, using tilde expansion"
+    fi
+    
     # Check if key pair exists in AWS
-    if aws ec2 describe-key-pairs --key-names $KEY_NAME --region $AWS_REGION >/dev/null 2>&1; then
+    if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region $AWS_REGION >/dev/null 2>&1; then
         print_warning "Key pair $KEY_NAME already exists in AWS"
         
         # Check if we have the private key locally
-        SSH_KEY_PATH="$HOME/.ssh/$KEY_NAME.pem"
         if [ -f "$SSH_KEY_PATH" ]; then
             print_status "Private key found locally at $SSH_KEY_PATH"
             return 0
@@ -107,29 +117,55 @@ create_key_pair() {
             print_warning "Private key not found locally at $SSH_KEY_PATH"
             print_status "Deleting existing key pair and creating new one..."
             
-            # Delete existing key pair from AWS
-            aws ec2 delete-key-pair \
-                --key-name $KEY_NAME \
-                --region $AWS_REGION
+            # Delete existing key pair from AWS with error handling
+            if aws ec2 delete-key-pair \
+                --key-name "$KEY_NAME" \
+                --region $AWS_REGION; then
+                print_success "Existing key pair deleted from AWS"
+            else
+                print_error "Failed to delete existing key pair from AWS"
+                print_error "You may need to delete it manually in the AWS Console"
+                return 1
+            fi
             
-            print_success "Existing key pair deleted from AWS"
+            # Verify deletion was successful
+            aws ec2 wait key-pair-deleted --key-names $KEY_NAME --region $AWS_REGION
+            if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region $AWS_REGION >/dev/null 2>&1; then
+                print_error "Key pair still exists in AWS after deletion attempt"
+                print_error "Please delete $KEY_NAME manually in AWS Console and retry"
+                return 1
+            fi
         fi
     fi
     
     print_status "Creating new key pair: $KEY_NAME"
     
-    # Ensure .ssh directory exists
-    mkdir -p ~/.ssh
+    # Ensure .ssh directory exists with proper permissions
+    if [ ! -d "$SSH_DIR" ]; then
+        mkdir -p "$SSH_DIR"
+        chmod 700 "$SSH_DIR"
+        print_status "Created SSH directory at $SSH_DIR"
+    fi
     
-    # Create new key pair
-    aws ec2 create-key-pair \
-        --key-name $KEY_NAME \
+    # Create new key pair with error handling
+    if aws ec2 create-key-pair \
+        --key-name "$KEY_NAME" \
         --region $AWS_REGION \
         --query 'KeyMaterial' \
-        --output text > ~/.ssh/$KEY_NAME.pem
-    
-    chmod 400 ~/.ssh/$KEY_NAME.pem
-    print_success "Key pair created and saved to ~/.ssh/$KEY_NAME.pem"
+        --output text > "$SSH_KEY_PATH"; then
+        
+        chmod 400 "$SSH_KEY_PATH"
+        print_success "Key pair created and saved to $SSH_KEY_PATH"
+        
+        # Verify the key file was created successfully
+        if [ ! -f "$SSH_KEY_PATH" ] || [ ! -s "$SSH_KEY_PATH" ]; then
+            print_error "Key pair creation appeared to succeed but file is missing or empty"
+            return 1
+        fi
+    else
+        print_error "Failed to create key pair in AWS"
+        return 1
+    fi
 }
 
 # Function to get or create EC2 instance
@@ -311,7 +347,12 @@ deploy_to_ec2() {
     print_status "Deploying application to EC2 instance: $INSTANCE_ID"
     
     # Check if SSH key exists
-    SSH_KEY_PATH="$HOME/.ssh/$KEY_NAME.pem"
+    if [ -n "$HOME" ] && [ -d "$HOME" ]; then
+        SSH_KEY_PATH="$HOME/.ssh/$KEY_NAME.pem"
+    else
+        SSH_KEY_PATH=~/.ssh/$KEY_NAME.pem
+    fi
+    
     if [ ! -f "$SSH_KEY_PATH" ]; then
         print_warning "SSH key not found at $SSH_KEY_PATH. This is normal in CI/CD environments."
         print_status "Using EC2 Instance Connect or user data for deployment..."
@@ -435,7 +476,12 @@ show_status() {
         echo "  Prometheus: http://$PUBLIC_IP:9090"
         echo ""
         echo "🔗 SSH Access:"
-        SSH_KEY_PATH="$HOME/.ssh/$KEY_NAME.pem"
+        if [ -n "$HOME" ] && [ -d "$HOME" ]; then
+            SSH_KEY_PATH="$HOME/.ssh/$KEY_NAME.pem"
+        else
+            SSH_KEY_PATH=~/.ssh/$KEY_NAME.pem
+        fi
+        
         if [ -f "$SSH_KEY_PATH" ]; then
             echo "  ssh -i $SSH_KEY_PATH ec2-user@$PUBLIC_IP"
         else
