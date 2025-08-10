@@ -32,10 +32,10 @@ Your California Housing Price Prediction API now has comprehensive Prometheus mo
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| **🏠 API** | http://localhost:5003/ | Main application |
-| **📖 Swagger** | http://localhost:5003/docs/ | Interactive API docs |
-| **📊 Metrics** | http://localhost:5003/metrics | Combined Prometheus metrics |
-| **🔍 ML Metrics** | http://localhost:5003/ml-metrics | ML-specific metrics |
+| **🏠 API** | http://localhost:5001/ | Main application |
+| **📖 Swagger** | http://localhost:5001/docs/ | Interactive API docs |
+| **📊 Metrics** | http://localhost:5001/metrics | Combined Prometheus metrics |
+| **🔍 ML Metrics** | http://localhost:5001/ml-metrics | ML-specific metrics |
 
 ### 📈 Key Metrics Examples
 
@@ -95,12 +95,12 @@ python test_api.py
 python test_prometheus.py
 
 # Make test prediction
-curl -X POST http://localhost:5003/api/v1/prediction/predict \
+curl -X POST http://localhost:5001/api/v1/prediction/predict \
   -H "Content-Type: application/json" \
   -d '{"med_inc": 8.3252, "house_age": 41.0, "ave_rooms": 6.984127, "ave_bedrms": 1.02381, "population": 322.0, "ave_occup": 2.555556, "latitude": 37.88, "longitude": -122.23}'
 
 # View metrics
-curl http://localhost:5003/metrics
+curl http://localhost:5001/metrics
 ```
 
 ### 💡 Key Features
