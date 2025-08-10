@@ -13,7 +13,7 @@ on:
       deploy_target:
         description: 'Deployment target'
         required: true
-        default: 'local'
+        default: 'aws'
         type: choice
         options:
         - local
@@ -32,241 +32,241 @@ env:
 
 jobs:
   # Job 1: Lint and Test (runs on all events)
-  lint-and-test:
-    runs-on: ubuntu-latest
+  # lint-and-test:
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+  #   - name: Set up Python
+  #     uses: actions/setup-python@v4
+  #     with:
+  #       python-version: '3.10'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8 black pytest
-        pip install -r requirements.txt
+  #   - name: Install dependencies
+  #     run: |
+  #       python -m pip install --upgrade pip
+  #       pip install flake8 black pytest
+  #       pip install -r requirements.txt
 
-    - name: Lint with flake8
-      run: |
-        # Stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # Exit-zero treats all errors as warnings
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+  #   - name: Lint with flake8
+  #     run: |
+  #       # Stop the build if there are Python syntax errors or undefined names
+  #       flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+  #       # Exit-zero treats all errors as warnings
+  #       flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-    # - name: Format check with black
-    #   run: |
-    #     black --check --diff .
+  #   # - name: Format check with black
+  #   #   run: |
+  #   #     black --check --diff .
 
-    - name: Run unit tests (no API required)
-      run: |
-        # Run unit tests that don't require API
-        python -m pytest tests/test_unit.py -v --tb=short
+  #   - name: Run unit tests (no API required)
+  #     run: |
+  #       # Run unit tests that don't require API
+  #       python -m pytest tests/test_unit.py -v --tb=short
 
-    - name: Run basic Python syntax checks
-      run: |
-        # Run basic Python syntax validation on source code
-        python -m py_compile src/*.py
-        python -m py_compile api/*.py
-        echo "✅ Python syntax validation passed"
+  #   - name: Run basic Python syntax checks
+  #     run: |
+  #       # Run basic Python syntax validation on source code
+  #       python -m py_compile src/*.py
+  #       python -m py_compile api/*.py
+  #       echo "✅ Python syntax validation passed"
 
-    - name: Start services for API testing
-      if: github.event_name != 'pull_request'
-      run: |
-        # Start services in background
-        docker compose up -d --build
-        echo "Services starting..."
+  #   - name: Start services for API testing
+  #     if: github.event_name != 'pull_request'
+  #     run: |
+  #       # Start services in background
+  #       docker compose up -d --build
+  #       echo "Services starting..."
 
-    - name: Wait for services to be ready
-      if: github.event_name != 'pull_request'
-      run: |
-        # Wait for API to be healthy
-        echo "Waiting for API to start..."
-        for i in {1..30}; do
-          if curl -f http://localhost:8000/api/v1/health/ 2>/dev/null; then
-            echo "✅ API is ready!"
-            break
-          fi
-          echo "Waiting... ($i/30)"
-          sleep 10
-        done
+  #   - name: Wait for services to be ready
+  #     if: github.event_name != 'pull_request'
+  #     run: |
+  #       # Wait for API to be healthy
+  #       echo "Waiting for API to start..."
+  #       for i in {1..30}; do
+  #         if curl -f http://localhost:8000/api/v1/health/ 2>/dev/null; then
+  #           echo "✅ API is ready!"
+  #           break
+  #         fi
+  #         echo "Waiting... ($i/30)"
+  #         sleep 10
+  #       done
 
-    - name: Run API and integration tests
-      if: github.event_name != 'pull_request'
-      run: |
-        # Run API tests (require running services)
-        python -m pytest tests/test_api.py tests/test_api_comprehensive.py tests/test_prometheus.py -v --tb=short
+  #   - name: Run API and integration tests
+  #     if: github.event_name != 'pull_request'
+  #     run: |
+  #       # Run API tests (require running services)
+  #       python -m pytest tests/test_api.py tests/test_api_comprehensive.py tests/test_prometheus.py -v --tb=short
 
-    - name: Run PR-specific lightweight tests
-      if: github.event_name == 'pull_request'
-      run: |
-        # Run only essential tests for feature PRs
-        echo "🔍 Running lightweight tests for PR..."
-        python -m pytest tests/test_unit.py -v --tb=short
-        echo "✅ PR tests completed"
+  #   - name: Run PR-specific lightweight tests
+  #     if: github.event_name == 'pull_request'
+  #     run: |
+  #       # Run only essential tests for feature PRs
+  #       echo "🔍 Running lightweight tests for PR..."
+  #       python -m pytest tests/test_unit.py -v --tb=short
+  #       echo "✅ PR tests completed"
 
-    - name: Cleanup services
-      if: always() && (github.event_name != 'pull_request')
-      run: |
-        docker compose down
+  #   - name: Cleanup services
+  #     if: always() && (github.event_name != 'pull_request')
+  #     run: |
+  #       docker compose down
 
   # Job 2: Check for new data and retrain model (skip for PRs to non-main branches)
-  check-data-and-retrain:
-    runs-on: ubuntu-latest
-    needs: lint-and-test
-    if: github.event_name != 'pull_request'
-    outputs:
-      model_updated: ${{ steps.retrain.outputs.model_updated }}
-      model_version: ${{ steps.retrain.outputs.model_version }}
+  # check-data-and-retrain:
+  #   runs-on: ubuntu-latest
+  #   needs: lint-and-test
+  #   if: github.event_name != 'pull_request'
+  #   outputs:
+  #     model_updated: ${{ steps.retrain.outputs.model_updated }}
+  #     model_version: ${{ steps.retrain.outputs.model_version }}
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+  #   - name: Set up Python
+  #     uses: actions/setup-python@v4
+  #     with:
+  #       python-version: '3.10'
 
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+  #   - name: Install dependencies
+  #     run: |
+  #       pip install -r requirements.txt
 
-    - name: Check for new data
-      id: check_data
-      run: |
-        # Simulate checking for new data (replace with actual data source check)
-        echo "Checking for new data..."
+  #   - name: Check for new data
+  #     id: check_data
+  #     run: |
+  #       # Simulate checking for new data (replace with actual data source check)
+  #       echo "Checking for new data..."
 
-        # Check if forced retraining is requested
-        if [ "${{ github.event.inputs.retrain_model }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
-          echo "new_data=true" >> $GITHUB_OUTPUT
-          echo "🔄 Model retraining triggered"
-        else
-          # Check if .dvc file was updated in the latest commit
-          # First check if we have more than one commit
-          if [ $(git rev-list --count HEAD) -gt 1 ]; then
-            if git diff --name-only HEAD~1 HEAD | grep -q '\.dvc$'; then
-              echo "new_data=true" >> $GITHUB_OUTPUT
-              echo "🔄 .dvc file updated, triggering retraining"
-            else
-              echo "new_data=false" >> $GITHUB_OUTPUT
-              echo "✅ No .dvc update detected"
-            fi
-          else
-            # For initial commits or single commit repos, check if .dvc files exist
-            if find . -name "*.dvc" -type f | grep -q .; then
-              echo "new_data=true" >> $GITHUB_OUTPUT
-              echo "🔄 Initial commit with .dvc files detected, triggering retraining"
-            else
-              echo "new_data=false" >> $GITHUB_OUTPUT
-              echo "✅ Initial commit, no .dvc files found"
-            fi
-          fi
-        fi
+  #       # Check if forced retraining is requested
+  #       if [ "${{ github.event.inputs.retrain_model }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+  #         echo "new_data=true" >> $GITHUB_OUTPUT
+  #         echo "🔄 Model retraining triggered"
+  #       else
+  #         # Check if .dvc file was updated in the latest commit
+  #         # First check if we have more than one commit
+  #         if [ $(git rev-list --count HEAD) -gt 1 ]; then
+  #           if git diff --name-only HEAD~1 HEAD | grep -q '\.dvc$'; then
+  #             echo "new_data=true" >> $GITHUB_OUTPUT
+  #             echo "🔄 .dvc file updated, triggering retraining"
+  #           else
+  #             echo "new_data=false" >> $GITHUB_OUTPUT
+  #             echo "✅ No .dvc update detected"
+  #           fi
+  #         else
+  #           # For initial commits or single commit repos, check if .dvc files exist
+  #           if find . -name "*.dvc" -type f | grep -q .; then
+  #             echo "new_data=true" >> $GITHUB_OUTPUT
+  #             echo "🔄 Initial commit with .dvc files detected, triggering retraining"
+  #           else
+  #             echo "new_data=false" >> $GITHUB_OUTPUT
+  #             echo "✅ Initial commit, no .dvc files found"
+  #           fi
+  #         fi
+  #       fi
 
-    - name: Retrain model if needed
-      id: retrain
-      if: steps.check_data.outputs.new_data == 'true'
-      run: |
-        echo "🚀 Starting model retraining..."
+  #   - name: Retrain model if needed
+  #     id: retrain
+  #     if: steps.check_data.outputs.new_data == 'true'
+  #     run: |
+  #       echo "🚀 Starting model retraining..."
 
-        # Generate version
-        VERSION=$(date +%Y%m%d-%H%M%S)
-        echo "model_version=$VERSION" >> $GITHUB_OUTPUT
+  #       # Generate version
+  #       VERSION=$(date +%Y%m%d-%H%M%S)
+  #       echo "model_version=$VERSION" >> $GITHUB_OUTPUT
 
-        # Load and preprocess data
-        python -c "
-        from sklearn.datasets import fetch_california_housing
-        import pandas as pd
-        import os
+  #       # Load and preprocess data
+  #       python -c "
+  #       from sklearn.datasets import fetch_california_housing
+  #       import pandas as pd
+  #       import os
 
-        os.makedirs('data/california_housing_dataset', exist_ok=True)
-        data = fetch_california_housing(as_frame=True)
-        df = data.frame
-        df.to_csv('data/california_housing_dataset/housing.csv', index=False)
-        print('✅ Data loaded successfully')
-        "
+  #       os.makedirs('data/california_housing_dataset', exist_ok=True)
+  #       data = fetch_california_housing(as_frame=True)
+  #       df = data.frame
+  #       df.to_csv('data/california_housing_dataset/housing.csv', index=False)
+  #       print('✅ Data loaded successfully')
+  #       "
 
-        # Train models
-        python -m src.model_train
+  #       # Train models
+  #       python -m src.model_train
 
-        # Tag models with version
-        mkdir -p models/versions/$VERSION
-        cp models/*.joblib models/versions/$VERSION/
+  #       # Tag models with version
+  #       mkdir -p models/versions/$VERSION
+  #       cp models/*.joblib models/versions/$VERSION/
 
-        echo "model_updated=true" >> $GITHUB_OUTPUT
-        echo "✅ Model retraining completed - Version: $VERSION"
+  #       echo "model_updated=true" >> $GITHUB_OUTPUT
+  #       echo "✅ Model retraining completed - Version: $VERSION"
 
-    - name: Upload model artifacts
-      if: steps.retrain.outputs.model_updated == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: trained-models-${{ steps.retrain.outputs.model_version }}
-        path: |
-          models/
-          mlruns/
-        retention-days: 30
+  #   - name: Upload model artifacts
+  #     if: steps.retrain.outputs.model_updated == 'true'
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: trained-models-${{ steps.retrain.outputs.model_version }}
+  #       path: |
+  #         models/
+  #         mlruns/
+  #       retention-days: 30
 
-  # Job 3: Build and Push Docker Image (skip for PRs to non-main branches)
-  build-and-push:
-    runs-on: ubuntu-latest
-    needs: [lint-and-test, check-data-and-retrain]
-    if: |
-      always() &&
-      needs.lint-and-test.result == 'success' &&
-      github.event_name != 'pull_request'
-    outputs:
-      image_tag: ${{ steps.tags.outputs.image_tag }}
-      version: ${{ steps.tags.outputs.version }}
+  # # Job 3: Build and Push Docker Image (skip for PRs to non-main branches)
+  # build-and-push:
+  #   runs-on: ubuntu-latest
+  #   needs: [lint-and-test, check-data-and-retrain]
+  #   if: |
+  #     always() &&
+  #     needs.lint-and-test.result == 'success' &&
+  #     github.event_name != 'pull_request'
+  #   outputs:
+  #     image_tag: ${{ steps.tags.outputs.image_tag }}
+  #     version: ${{ steps.tags.outputs.version }}
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
 
-    - name: Download model artifacts (if updated)
-      if: needs.check-data-and-retrain.outputs.model_updated == 'true'
-      uses: actions/download-artifact@v4
-      with:
-        name: trained-models-${{ needs.check-data-and-retrain.outputs.model_version }}
+  #   - name: Download model artifacts (if updated)
+  #     if: needs.check-data-and-retrain.outputs.model_updated == 'true'
+  #     uses: actions/download-artifact@v4
+  #     with:
+  #       name: trained-models-${{ needs.check-data-and-retrain.outputs.model_version }}
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+  #   - name: Set up Docker Buildx
+  #     uses: docker/setup-buildx-action@v3
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #   - name: Login to Docker Hub
+  #     uses: docker/login-action@v3
+  #     with:
+  #       username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #       password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Generate image tags
-      id: tags
-      run: |
-        VERSION=${GITHUB_SHA:0:8}
-        MODEL_VERSION=${{ needs.check-data-and-retrain.outputs.model_version }}
+  #   - name: Generate image tags
+  #     id: tags
+  #     run: |
+  #       VERSION=${GITHUB_SHA:0:8}
+  #       MODEL_VERSION=${{ needs.check-data-and-retrain.outputs.model_version }}
 
-        if [ "$MODEL_VERSION" != "" ]; then
-          VERSION="${VERSION}-model-${MODEL_VERSION}"
-        fi
+  #       if [ "$MODEL_VERSION" != "" ]; then
+  #         VERSION="${VERSION}-model-${MODEL_VERSION}"
+  #       fi
 
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "image_tag=${DOCKER_IMAGE}:${VERSION}" >> $GITHUB_OUTPUT
-        echo "latest_tag=${DOCKER_IMAGE}:latest" >> $GITHUB_OUTPUT
+  #       echo "version=$VERSION" >> $GITHUB_OUTPUT
+  #       echo "image_tag=${DOCKER_IMAGE}:${VERSION}" >> $GITHUB_OUTPUT
+  #       echo "latest_tag=${DOCKER_IMAGE}:latest" >> $GITHUB_OUTPUT
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: |
-          ${{ steps.tags.outputs.image_tag }}
-          ${{ steps.tags.outputs.latest_tag }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+  #   - name: Build and push Docker image
+  #     uses: docker/build-push-action@v5
+  #     with:
+  #       context: .
+  #       platforms: linux/amd64,linux/arm64
+  #       push: true
+  #       tags: |
+  #         ${{ steps.tags.outputs.image_tag }}
+  #         ${{ steps.tags.outputs.latest_tag }}
+  #       cache-from: type=gha
+  #       cache-to: type=gha,mode=max
 
   # Job 4: Deploy Locally (skip for PRs to non-main branches)
   deploy-local:
