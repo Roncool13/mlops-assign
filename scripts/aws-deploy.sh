@@ -193,6 +193,9 @@ eic_generate_ephemeral_key() {
 
   if [[ ! -f "$EIC_PRIV" ]]; then
     print_status "Generating ephemeral SSH key (ed25519)..."
+    # The SSH key is generated without a passphrase (-N "") because it is ephemeral and used only for EC2 Instance Connect (EIC).
+    # This is a deliberate security trade-off: the key is short-lived, stored in a temporary directory, and valid only for a brief window.
+    # Adding a passphrase would complicate automation without improving security for this use case.
     ssh-keygen -t ed25519 -N "" -f "$EIC_PRIV" >/dev/null
   fi
   export EIC_PRIV EIC_PUB EIC_KEY_DIR
