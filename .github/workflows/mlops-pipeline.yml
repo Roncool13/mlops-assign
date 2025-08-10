@@ -165,7 +165,7 @@ jobs:
                 echo "🔄 Initial commit with .dvc file update detected, triggering retraining"
               else
                 echo "new_data=false" >> $GITHUB_OUTPUT
-                echo "✅ Initial commit, no .dvc file update detected"
+                echo "✅ DVC files exist but no updates detected in latest commit"
               fi
             else
               echo "new_data=false" >> $GITHUB_OUTPUT
