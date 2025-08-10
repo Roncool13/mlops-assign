@@ -3,6 +3,7 @@
 # AWS Deployment Script for MLOps Pipeline (EIC-first)
 # This version uses EC2 Instance Connect with an ephemeral SSH key per run.
 # Fallback to SSM/user-data remains available.
+# Extra checks for existing resources and proper setup.
 
 set -euo pipefail
 
