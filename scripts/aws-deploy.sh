@@ -166,7 +166,7 @@ create_key_pair() {
     
     # Create new key pair with error handling
     if aws ec2 create-key-pair \
-        --key-name $KEY_NAME \
+        --key-name "$KEY_NAME" \
         --region $AWS_REGION \
         --query 'KeyMaterial' \
         --output text > "$SSH_KEY_PATH"; then
