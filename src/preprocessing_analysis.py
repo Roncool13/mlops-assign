@@ -4,6 +4,7 @@ import sys
 
 # Local Imports
 from data_preprocess import (
+     apply_transformations,
     load_and_clean_data, 
     preprocess_for_linear_regression, 
     preprocess_for_decision_tree
@@ -29,7 +30,7 @@ def detailed_preprocessing_analysis():
     df_result = load_and_clean_data(DATA_PATH)
     df = df_result[1] if isinstance(df_result, tuple) else df_result
     
-    print(f"\n🔍 ORIGINAL DATASET ANALYSIS")
+    print("\n🔍 ORIGINAL DATASET ANALYSIS")
     print(f"Shape: {df.shape}")
     print(f"Columns: {list(df.columns)}")
     
@@ -41,7 +42,7 @@ def detailed_preprocessing_analysis():
         print(f"  {col:15}: {skew_val:6.3f} {status}")
     
     # Test Linear Regression preprocessing
-    print(f"\n🧮 LINEAR REGRESSION PREPROCESSING")
+    print("\n🧮 LINEAR REGRESSION PREPROCESSING")
     X_train_lr, X_test_lr, y_train_lr, y_test_lr, scaler = preprocess_for_linear_regression(df)
     print(f"  Input shape: {df.shape}")
     print(f"  Output training shape: {X_train_lr.shape}")
@@ -50,7 +51,6 @@ def detailed_preprocessing_analysis():
     
     # Show feature names (if available)
     df_processed_lr = df.copy()
-    from data_preprocess import apply_transformations
     df_processed_lr = apply_transformations(df_processed_lr)
     
     # Handle both possible target column names
@@ -82,7 +82,7 @@ def detailed_preprocessing_analysis():
     
     # Show data quality
     print("\n📈 DATA QUALITY")
-    print(f"  Missing values: {df.isnull().sum().sum()}")
+    print(f"  Missing values: {df.isnull().sum()}")
     print(f"  Duplicate rows: {df.duplicated().sum()}")
     print("  Data types: All numeric ✅")
     
