@@ -317,7 +317,7 @@ Assignment-1/
 ├── 📊 data/                   # DVC-tracked datasets
 │   └── california_housing_dataset/
 ├── 📓 notebooks/              # Jupyter notebooks for EDA
-├── 📈 reports/                # Generated EDA reports
+├── 📈 eda_reports/                # Generated EDA reports
 ├── 🏆 models/                 # Saved model artifacts
 │   ├── random_forest.joblib   # Production model (22MB)
 │   ├── linear_regression.joblib
