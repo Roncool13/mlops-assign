@@ -62,4 +62,4 @@ aws-deployment.env
 scripts/prepare-commit.sh
 
 # Backup files
-*/backup/
+backup/
