@@ -78,6 +78,12 @@ def train_model_with_mlflow(model, model_name, X_train, X_test, y_train, y_test,
             joblib.dump(scaler, scaler_path)
             mlflow.log_artifact(scaler_path, "scaler")
         
+        # Save model as joblib file for API usage
+        os.makedirs("models", exist_ok=True)
+        model_path = f"models/{model_name}.joblib"
+        joblib.dump(model, model_path)
+        print(f"💾 Model saved to {model_path}")
+        
         run_id = mlflow.active_run().info.run_id
         print(f"✅ {model_name} - RMSE: {metrics['rmse']:.4f}, R²: {metrics['r2']:.4f} (Run: {run_id[:8]})")
         

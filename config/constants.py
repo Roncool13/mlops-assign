@@ -14,4 +14,4 @@ def find_root_directory():
 # Constants for the project
 ROOT_PATH = find_root_directory()
 DATA_PATH = os.path.join(ROOT_PATH, "data", "california_housing_dataset", "housing.csv")
-REPORTS_PATH = os.path.join(ROOT_PATH, "reports")
+REPORTS_PATH = os.path.join(ROOT_PATH, "eda_reports")
