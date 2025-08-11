@@ -125,6 +125,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        # fetch-depth: 2 is required to allow diff comparisons between the last two commits for data change detection and model retraining logic.
+        fetch-depth: 2
 
     - name: Set up Python
       uses: actions/setup-python@v4
