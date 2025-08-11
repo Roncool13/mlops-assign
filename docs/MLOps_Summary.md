@@ -141,7 +141,7 @@ Assignment-1/
 ├── config/                 # Configuration constants
 ├── data/                   # Dataset (DVC tracked)
 ├── notebooks/              # EDA notebooks
-├── reports/                # EDA reports
+├── eda_reports/                # EDA reports
 ├── .github/workflows/      # CI/CD pipeline
 ├── Dockerfile             # Container configuration
 ├── requirements.txt       # Python dependencies
